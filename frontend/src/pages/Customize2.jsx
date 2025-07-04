@@ -12,6 +12,7 @@ function Customize2() {
     const navigate = useNavigate()
 
     const handleUpdateAssistant = async()=>{
+      setLoading(true)
         try {
             const formData = new FormData()
             formData.append("assistantName",assistantName)
@@ -25,6 +26,7 @@ function Customize2() {
             console.log(result.data)
             setUserData(result.data)
             setLoading(false)
+            navigate("/")
         } catch (error) {
             console.log(error)
             setLoading(false)
@@ -50,6 +52,7 @@ function Customize2() {
   />
   {assistantName && <button className='min-w-[300px] h-[60px] mt-[30px] bg-white rounded-full text-black font-semibold text-[19px] cursor-pointer' disabled={loading} onClick={() => {
     handleUpdateAssistant()
+ 
   }}>
   {!loading?"Finally Create Your Assisstant":"Loading.."}</button>}
 
