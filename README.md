@@ -26,16 +26,4 @@ Welcome to the **GenAI Virtual Assistant** — a mind-blowing full-stack project
 - **Auth**: JWT + bcryptjs
 - **File Uploads**: Multer + Cloudinary
 - **Hosting**: Render
-
----
-
-## 🧰 Project Structure
-
-/client --> React frontend (SignIn, Customize, Home)
-/server --> Express backend (Auth, Assistant APIs)
-/models --> MongoDB models (User)
-/middlewares --> JWT auth check
-/utils --> Gemini AI integration, cloud config
-/assets --> Assistant images, icons, and GIFs
-
-
+  
