@@ -2,14 +2,23 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { UserDataContext } from '../context/UserDataContext';
+import ai from "../assets/ai.gif"
+import user from "../assets/user.gif"
 
 function Home() {
   const { userData, serverUrl, setUserData, getGeminiResponse } = useContext(UserDataContext);
   const navigate = useNavigate();
+
+  const [userText, setUserText] = useState("")
+ const [aiText, setAiText] = useState("") 
+
   const [listening, setListening] = useState(false);
-  const isSpeakingRef = useRef(false);
+  const [voiceUnlocked, setVoiceUnlocked] = useState(false);
+
   const recognitionRef = useRef(null);
+  const isSpeakingRef = useRef(false);
   const isRecognizingRef = useRef(false);
+
   const synth = window.speechSynthesis;
 
   const handleLogOut = async () => {
@@ -22,172 +31,177 @@ function Home() {
     }
   };
 
+  const speak = (text, lang = 'en-US') => {
+    if (!voiceUnlocked || !text) return;
+
+    if (synth.speaking) synth.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+
+    const loadAndSpeak = () => {
+      const voices = synth.getVoices();
+      const selectedVoice = voices.find((v) => v.lang === lang || v.lang.startsWith('en'));
+
+      if (selectedVoice) utterance.voice = selectedVoice;
+
+      isSpeakingRef.current = true;
+      utterance.onend = () => {
+        setAiText("")
+        isSpeakingRef.current = false;
+        startRecognition();
+      };
+
+      synth.speak(utterance);
+    };
+
+    if (!synth.getVoices().length) {
+      synth.onvoiceschanged = loadAndSpeak;
+    } else {
+      loadAndSpeak();
+    }
+  };
+
   const startRecognition = () => {
-    try {
-      recognitionRef.current?.start();
-      setListening(true);
-    } catch (error) {
-      if (!error.message.includes('start')) {
-        console.error('Recognition error:', error);
+    if (recognitionRef.current && !isSpeakingRef.current && !isRecognizingRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch (err) {
+        if (!err.message.includes('start')) {
+          console.error('Recognition start error:', err);
+        }
       }
     }
   };
 
-  const speak = (text, lang = 'en-US') => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang;
-
-    let voices = window.speechSynthesis.getVoices();
-    if (!voices.length) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        voices = window.speechSynthesis.getVoices();
-      };
+  const stopRecognition = () => {
+    if (recognitionRef.current && isRecognizingRef.current) {
+      recognitionRef.current.stop();
     }
-
-    const selectedVoice = voices.find((voice) => voice.lang === lang);
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
-
-    isSpeakingRef.current = true;
-    utterance.onend = () => {
-      isSpeakingRef.current = false;
-      startRecognition();
-    };
-
-    synth.speak(utterance);
   };
 
-  const handleCommand = (data) => {
-    const { type, userInput, response } = data;
+  const handleCommand = (data, userInput) => {
+    const { type, response } = data;
+
+    speak(response);
 
     switch (type) {
-      case 'general':
-        speak(response);
-        break;
       case 'google_search':
-        speak(response);
         window.open(`https://www.google.com/search?q=${encodeURIComponent(userInput)}`, '_blank');
         break;
       case 'youtube_search':
       case 'youtube_play':
-        speak(response);
         window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(userInput)}`, '_blank');
         break;
       case 'youtube_open':
-        speak(response);
         window.open('https://www.youtube.com', '_blank');
         break;
       case 'calculator_open':
-        speak(response);
         window.open('https://www.google.com/search?q=calculator', '_blank');
         break;
       case 'instagram_open':
-        speak(response);
         window.open('https://www.instagram.com', '_blank');
         break;
       case 'facebook_open':
-        speak(response);
         window.open('https://www.facebook.com', '_blank');
         break;
       case 'weather_show':
-        speak(response);
         window.open(`https://www.google.com/search?q=weather+in+my+location`, '_blank');
         break;
       default:
-        console.warn('Unknown type:', type);
         break;
     }
   };
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition not supported in this browser.');
+      return;
+    }
+
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.lang = 'en-US';
+
     recognitionRef.current = recognition;
 
-    const safeRecognition = () => {
-      if (!isSpeakingRef.current && !isRecognizingRef.current) {
-        try {
-          recognition.start();
-          console.log('Recognition requested to start');
-        } catch (error) {
-          if (error.name !== 'InvalidStateError') {
-            console.error('Start error:', error);
-          }
-        }
-      }
-    };
-
     recognition.onstart = () => {
-      console.log('Recognition started');
       isRecognizingRef.current = true;
       setListening(true);
+      console.log("Recognition started");
     };
 
     recognition.onend = () => {
-      console.log('Recognition ended');
       isRecognizingRef.current = false;
       setListening(false);
+      console.log("Recognition ended");
+
       if (!isSpeakingRef.current) {
         setTimeout(() => {
-          safeRecognition();
+          startRecognition();
         }, 1000);
       }
     };
 
     recognition.onerror = (e) => {
-      console.warn('Recognition error:', e.error);
       isRecognizingRef.current = false;
       setListening(false);
+      console.warn('Recognition error:', e.error);
+
       if (e.error !== 'aborted' && !isSpeakingRef.current) {
         setTimeout(() => {
-          safeRecognition();
+          startRecognition();
         }, 1000);
       }
     };
 
     recognition.onresult = async (e) => {
-      const transcript = e.results[e.results.length - 1][0].transcript.trim();
-      console.log('hear:', transcript);
-      if (transcript.toLowerCase().includes(userData.assistantName.toLowerCase())) {
-        recognition.stop();
-        recognitionRef.current = null;
-        setListening(false);
-        const data = await getGeminiResponse(transcript);
-        console.log('Gemini data:', data);
-        handleCommand(data);
-      }
-    };
+  const transcript = e.results[e.results.length - 1][0].transcript.trim();
+  console.log('Heard:', transcript);
 
-    const fallback = setInterval(() => {
-      if (!isSpeakingRef.current && !isRecognizingRef.current) {
-        safeRecognition();
-      }
-    }, 10000);
+  const assistantName = userData.assistantName.toLowerCase();
+  const loweredTranscript = transcript.toLowerCase();
 
-    safeRecognition();
+  if (loweredTranscript.includes(assistantName)) {
+    setUserText(transcript)
+    setAiText("")
+    stopRecognition();
+
+
+    // Remove assistant name only once (at start or anywhere)
+    const cleanInput = loweredTranscript.replace(assistantName, '').trim();
+
+    console.log('Sending to Gemini:', cleanInput);
+
+    const data = await getGeminiResponse(cleanInput);
+    console.log('Gemini response:', data);
+
+    handleCommand(data, cleanInput);
+    setAiText(data.response)
+    setUserText("")
+  }
+};
+
+
+    startRecognition();
 
     return () => {
-      recognition.stop();
-      setListening(false);
-      isRecognizingRef.current = false;
-      clearInterval(fallback);
+      stopRecognition();
     };
-  }, []);
+  }, [voiceUnlocked]);
 
   return (
-    <div className='w-full h-[100vh] bg-gradient-to-t from-[black] to-[#22226a] flex justify-center items-center flex-col gap-[15px] '>
+    <div className='w-full h-[100vh] bg-gradient-to-t from-black to-[#22226a] flex justify-center items-center flex-col gap-[15px]'>
       <button
-        className='min-w-[150px] h-[60px] mt-[30px] bg-white rounded-full text-black font-semibold absolute top-[20px] right-[20px] text-[19px] cursor-pointer'
+        className='min-w-[150px] h-[60px] mt-[30px] bg-white rounded-full text-black font-semibold absolute top-[20px] right-[20px] text-[19px]'
         onClick={handleLogOut}
       >
         Log Out
       </button>
 
       <button
-        className='min-w-[150px] h-[60px] mt-[30px] bg-white rounded-full text-black font-semibold absolute top-[100px] right-[20px] text-[19px] cursor-pointer px-[20px] py-[10px] '
+        className='min-w-[150px] h-[60px] mt-[30px] bg-white rounded-full text-black font-semibold absolute top-[100px] right-[20px] text-[19px]'
         onClick={() => navigate('/customize')}
       >
         Customize your Assistant
@@ -196,7 +210,41 @@ function Home() {
       <div className='w-[300px] h-[400px] flex justify-center items-center overflow-hidden rounded-4xl shadow-lg'>
         <img src={userData?.assistantImage} alt='' className='h-full object-cover' />
       </div>
+
       <h1 className='text-white text-[18px] font-semibold '>I'm {userData?.assistantName}</h1>
+
+      {!aiText &&  <img src={user} alt="" className='w-[200px]' />}
+      {aiText &&  <img src={ai} alt="" className='w-[200px]' />}
+
+      <div className='flex flex-col items-center mt-6 px-4 w-full max-w-[600px]'>
+  {userText && (
+    <div className='bg-white text-black p-4 rounded-xl mb-4 w-full shadow-md'>
+      <p className='font-bold mb-1'>👤 You:</p>
+      <p>{userText}</p>
+    </div>
+  )}
+
+  {aiText && (
+    <div className='bg-blue-100 text-black p-4 rounded-xl w-full shadow-md'>
+      <p className='font-bold mb-1'>🤖 {userData?.assistantName}:</p>
+      <p>{aiText}</p>
+    </div>
+  )}
+</div>
+     
+
+      {!voiceUnlocked && (
+        <button
+          className='fixed bottom-6 right-6 bg-white text-black px-5 py-3 rounded-full shadow-md text-sm font-semibold z-50'
+          onClick={() => {
+            setVoiceUnlocked(true);
+            synth.getVoices(); // preload
+            console.log('Voice unlocked');
+          }}
+        >
+          🔓 Enable Voice
+        </button>
+      )}
     </div>
   );
 }

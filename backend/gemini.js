@@ -19,7 +19,8 @@ const geminiResponse = async(command,assistantName,userName)=>{
 "response": A short, voice-friendly reply to be read aloud (e.g., "Sure, playing it now", "Here's what I found", "Today is Tuesday", etc.).
 
 ### Type meanings:
-- "general": if it's a factual or informational question.
+- "general": if it's a factual or informational question.and if asked 
+any question the answer you know to then place it in general category only and answer the complete question with detailed related information
 - "google_search": if the user wants to search something on Google.
 - "youtube_search": if the user wants to search for something on YouTube.
 - "youtube_play": if the user wants to directly play a video or song.
